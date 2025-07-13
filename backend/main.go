@@ -7,24 +7,34 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 )
 
 type WorkOrder struct {
-	Date      string `json:"date"`
-	Inspector string `json:"inspector"`
-	Address   string `json:"address"`
-	Floor     string `json:"floor"`
-	Unit      string `json:"unit"`
-	Phone     string `json:"phone"`
-	Room      string `json:"room"`
-	Findings  string `json:"findings"`
-	Signature string `json:"signature"`
+	ID        int       `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Date      string    `json:"date"`
+	Inspector string    `json:"inspector"`
+	Address   string    `json:"address"`
+	Floor     string    `json:"floor"`
+	Unit      string    `json:"unit"`
+	Phone     string    `json:"phone"`
+	Room      string    `json:"room"`
+	Findings  string    `json:"findings"`
+	Signature string    `json:"signature"`
 }
 
 func submitHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "https://permutations.app")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		if r.Method != "POST" {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -46,6 +56,38 @@ func submitHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		fmt.Fprintf(w, "Submitted successfully")
+	}
+}
+
+func retrieveHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		rows, err := db.Query("SELECT id, created_at, date, inspector, address, floor, unit, phone, room, findings, signature FROM workorders ORDER BY created_at DESC")
+		if err != nil {
+			log.Printf("DB query error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var orders []WorkOrder
+		for rows.Next() {
+			var wo WorkOrder
+			err = rows.Scan(&wo.ID, &wo.CreatedAt, &wo.Date, &wo.Inspector, &wo.Address, &wo.Floor, &wo.Unit, &wo.Phone, &wo.Room, &wo.Findings, &wo.Signature)
+			if err != nil {
+				log.Printf("Scan error: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			orders = append(orders, wo)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(orders)
 	}
 }
 
@@ -72,6 +114,7 @@ func main() {
 	}
 
 	http.HandleFunc("/submit", submitHandler(db))
+	http.HandleFunc("/retrieve", retrieveHandler(db))
 
 	log.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

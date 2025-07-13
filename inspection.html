@@ -173,7 +173,7 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             try {
-                const response = await fetch('http://localhost:6660/submit', {
+                const response = await fetch('https://workorder.permutations.app/submit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
