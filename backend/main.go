@@ -28,7 +28,10 @@ type WorkOrder struct {
 
 func submitHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "https://permutations.app")
+		origin := r.Header.Get("Origin")
+		if origin == "https://permutations.app" || origin == "https://www.permutations.app" || origin == "http://localhost" { // Add more allowed origins as needed
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == "OPTIONS" {
@@ -36,7 +39,9 @@ func submitHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
 			return
 		}
 
