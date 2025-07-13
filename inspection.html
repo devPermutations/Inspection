@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&amp;display=swap" rel="stylesheet">
+    <title>Work Order Inspection Form</title>
+    <style>
+        html { height: 100%; overflow: hidden; background: linear-gradient(to right, #e0f7fa, #81d4fa); }
+        body { font-family: 'Roboto', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(to right, #e0f7fa, #81d4fa); height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; }
+        form { display: flex; flex-direction: column; }
+        .form-fields { border: 1px solid #ccc; border-radius: 5px; padding: 20px; background: white; }
+        label { margin-top: 10px; display: block; }
+        input, textarea, button { margin-bottom: 10px; padding: 8px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; font-size: 16px; }
+        input[type="date"] { font-weight: bold; }
+        textarea { resize: none; overflow: auto; }
+        #signature-pad { border: 1px solid #ccc; margin: 10px 0; background: white; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; height: 200px; }
+        button { padding: 10px; border: none; cursor: pointer; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #sign-btn { font-weight: bold; }
+        #submit-btn { background: #28a745; color: white; margin-top: 20px; margin-bottom: 40px; }
+        #output { margin-top: 20px; white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: none; }
+        #signature-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        #signature-modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 600px; }
+        #modal-buttons { display: flex; justify-content: space-between; margin-top: 10px; }
+        #clear-btn { background: #dc3545; color: white; }
+        #accept-btn { background: #28a745; color: white; }
+        #signature-preview { margin-top: 10px; width: 100%; }
+        #signature-preview img { width: 100%; max-width: 100%; border: 1px solid #ccc; border-radius: 5px; display: block; }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 1.6em;">Work Order Inspection Form</h1>
+    <form id="inspection-form">
+        <div class="form-fields">
+            <label for="date">Date:</label>
+            <input type="date" id="date" name="date" required>
+
+            <label for="inspector">Inspector's Name:</label>
+            <input type="text" id="inspector" name="inspector" required>
+
+            <label for="address">Building Address:</label>
+            <input type="text" id="address" name="address" required>
+
+            <label for="floor">Floor:</label>
+            <input type="text" id="floor" name="floor" required>
+
+            <label for="unit">Unit Number:</label>
+            <input type="text" id="unit" name="unit" required>
+
+            <label for="phone">Client Phone Number:</label>
+            <input type="tel" id="phone" name="phone" placeholder="(xxx) xxx-xxxx" required>
+
+            <label for="room">Room Description:</label>
+            <input type="text" id="room" name="room" required>
+
+            <label for="findings">Inspection Findings:</label>
+            <textarea id="findings" name="findings" rows="5" required></textarea>
+
+            <button type="button" id="sign-btn">Add Signature</button>
+            <input type="hidden" id="signature" name="signature">
+            <div id="signature-preview" style="display: none;">
+                <img id="signature-img" src="" alt="Signature">
+            </div>
+        </div>
+
+        <button type="submit" id="submit-btn">Submit</button>
+    </form>
+
+    <div id="output"></div>
+
+    <div id="signature-modal">
+        <div id="signature-modal-content">
+            <canvas id="signature-pad"></canvas>
+            <div id="modal-buttons">
+                <button id="clear-btn" onclick="clearSignature()">Clear</button>
+                <button id="accept-btn" onclick="acceptSignature()">Accept</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set default date to today
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+        // Phone number formatting
+        const phoneInput = document.getElementById('phone');
+        phoneInput.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 10) value = value.substring(0, 10);
+            let formatted = '';
+            if (value.length >= 1) formatted = '(' + value.substring(0, 3);
+            if (value.length >= 4) formatted += ') ' + value.substring(3, 6);
+            if (value.length >= 7) formatted += '-' + value.substring(6, 10);
+            e.target.value = formatted;
+        });
+
+        // Signature pad
+        const canvas = document.getElementById('signature-pad');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('touchstart', startTouch);
+        canvas.addEventListener('touchend', stopDrawing);
+        canvas.addEventListener('touchmove', draw);
+
+        function startDrawing(e) {
+            drawing = true;
+            draw(e); // Start drawing from the initial point
+        }
+
+        function startTouch(e) {
+            e.preventDefault();
+            drawing = true;
+            draw(e);
+        }
+
+        function stopDrawing() {
+            drawing = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = 'black';
+
+            const rect = canvas.getBoundingClientRect();
+            let x, y;
+            if (e.touches) {
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Modal controls
+        const modal = document.getElementById('signature-modal');
+        const signBtn = document.getElementById('sign-btn');
+
+        signBtn.addEventListener('click', () => {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            clearSignature(); // Reset on open
+        });
+
+        function acceptSignature() {
+            const dataUrl = canvas.toDataURL('image/png');
+            document.getElementById('signature').value = dataUrl;
+            document.getElementById('signature-img').src = dataUrl;
+            document.getElementById('signature-preview').style.display = 'block';
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        // Form submission
+        document.getElementById('inspection-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            try {
+                const response = await fetch('http://localhost:6660/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+                // Clear form
+                e.target.reset();
+                document.getElementById('signature-preview').style.display = 'none';
+                document.getElementById('signature').value = '';
+                document.getElementById('date').value = new Date().toISOString().split('T')[0]; // Reset date to today
+                alert('Form submitted successfully');
+            } catch (error) {
+                alert(`Unable to submit form at this time. Error: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html> 
