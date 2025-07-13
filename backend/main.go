@@ -29,8 +29,11 @@ type WorkOrder struct {
 func submitHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
+		log.Printf("Received Origin: %s", origin)
 		if origin == "https://permutations.app" || origin == "https://www.permutations.app" || origin == "http://localhost" { // Add more allowed origins as needed
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else {
+			log.Printf("Origin %s not allowed", origin)
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
