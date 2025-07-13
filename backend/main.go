@@ -49,14 +49,22 @@ func submitHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(`INSERT INTO workorders (date, inspector, address, floor, unit, phone, room, findings, signature)
+		result, err := db.Exec(`INSERT INTO workorders (date, inspector, address, floor, unit, phone, room, findings, signature)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 			wo.Date, wo.Inspector, wo.Address, wo.Floor, wo.Unit, wo.Phone, wo.Room, wo.Findings, wo.Signature)
 		if err != nil {
+			log.Printf("Insert error: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
+		}
+
+		rows, err := result.RowsAffected()
+		if err != nil {
+			log.Printf("RowsAffected error: %v", err)
+		} else {
+			log.Printf("Inserted %d rows", rows)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
