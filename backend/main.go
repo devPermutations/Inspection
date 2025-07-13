@@ -55,7 +55,8 @@ func submitHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		fmt.Fprintf(w, "Submitted successfully")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Submitted successfully"})
 	}
 }
 
